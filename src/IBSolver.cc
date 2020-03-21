@@ -8,6 +8,7 @@
 #include "BoundaryVector.h"
 #include "Grid.h"
 #include "State.h"
+#include "TangentSE2.h"
 #include "VectorOperations.h"
 #include <string>
 
@@ -221,6 +222,82 @@ Scalar AdjointIBSolver::N(const State& x) const {
 	return g;
 }	
 	
+   Scalar AdjointIBSolver2::N(const State& x) const {
+      // Get appropriate phase of periodic base flow
+      //int k = _period - x.timestep - 1; // if not periodic
+      int k = (_period - (x.timestep % _period)) % _period; // if periodic
+      //cout << "At time step " << x.timestep << ", phase k = " << k << endl;
+      Scalar g = Laplacian( CrossProduct( _x0periodic[k].q, x.q ));
+      g -= Curl( CrossProduct( x.q, _x0periodic[k].omega ));
+      return g;
+      // There is a term with dI/domega that should be added. 
+   }
+
+   void AdjointIBSolver2::advanceSubstep( State& x, const Scalar& nonlinear, int i ) {
+      // If the body is moving, update its position
+      if ( _model.isTimeDependent() ) {
+	 _model.updateOperators( x.time + _scheme.cn(i) * _dt );
+      }
+
+      // Evaluate Right-Hand-Side (a) for first equation of ProjectionSolver
+      Scalar a = Laplacian( x.omega );
+      a *= 0.5 * _model.getAlpha() * ( _scheme.an(i) + _scheme.bn(i) );
+      a += _scheme.an(i)*nonlinear;
+
+      if ( _scheme.bn(i) != 0 ) {
+	 // for ab2
+	 if ( _oldSaved == false ) {
+	    _Nprev = nonlinear;
+	 }
+
+	 a += _scheme.bn(i) * _Nprev;
+      }
+
+      a *= _dt;
+      a += x.omega;
+
+      // Evaluate Right-Hand-Side (b) for second equation of ProjectionSolver
+      double xbod, ybod, theta; // position of rigid body
+      double xdot, ydot, thetadot; // velocity of rigid body
+      //int k = _period - x.timestep - 1; // if not periodic
+      int k = (_period - (x.timestep % _period)) % _period; // if periodic
+      TangentSE2 g = _motion->getTransformation(_x0periodic[k].time);
+      g.getPosition(xbod, ybod, theta);
+      g.getVelocity(xdot, ydot, thetadot);
+      int n = _model.getNumPoints();
+      double dx2 = _grid.Dx() * _grid.Dx();
+      BoundaryVector b = _model.getConstraints();
+      b = 0;
+      for (int j = 0; j < n; ++j) {
+	 //b(X,j) += 2 * cos(theta) * dx2;
+	 //b(Y,j) += -2 * sin(theta) * dx2;
+	 //b(X,j) = 2 * sin(theta) * dx2;
+	 //b(Y,j) = 2 * cos(theta) * dx2;
+	 //b(X,j) += 2 * dx2 / pow(1 + ydot*ydot, 0.5); // heave drag
+	 //b(Y,j) += -2 * dx2 * ydot / pow(1 + ydot*ydot, 0.5); // heave drag
+	 //b(X,j) += 2 * dx2 * ydot / pow(1 + ydot*ydot, 0.5); // heave lift
+	 //b(Y,j) += 2 * dx2 / pow(1 + ydot*ydot, 0.5); // heave lift
+	 //b(X,j) += 2 * dx2; // heave drag
+	 //b(Y,j) += 0; // heave drag
+	 //b(X,j) += 0; // heave lift
+	 //b(Y,j) += 2*dx2; // heave lift
+          b(X,j) = dx2;
+      }
+
+      // b = 0; // b = (dI/df)^T, need to program this somehow
+
+      // Call the ProjectionSolver to determine the vorticity and forces
+	 _solver[i]->solve( a, b, x.omega, x.f );
+
+      // Update the state, for instance to compute the corresponding flux
+	 _model.refreshState( x ); // this may add  some base flow to flux, which is not needed for adjoint. Check this. 
+      _Nprev = nonlinear;
+
+      if( _oldSaved == false ) {
+	 _oldSaved = true;
+      }
+   }
+
 Scalar LinearizedPeriodicIBSolver::N(const State& x) const {
 	int k = x.timestep % _period;
 	cout << "At time step " << x.timestep << ", phase k = " << k << endl; 

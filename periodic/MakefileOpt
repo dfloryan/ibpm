@@ -1,0 +1,53 @@
+# Makefile for examples using IBPM library
+#
+# Clancy Rowley
+# Princeton University
+#
+# $Date$
+# $Revision$
+# $Author$
+# $HeadURL$
+
+include ../config/make.inc
+
+
+TARGETS = simple_withoptions
+OBJECTS = simple_withoptions.o
+
+LDLIBS = -lfftw3 -lm
+MAKEDEPEND = gcc -MM
+
+LDFLAGS += $(lib_dirs)
+CXXFLAGS += -I./Optimization # for optimization headers
+CXXFLAGS += -I./Optimization/solver # for optimization headers
+CXXFLAGS += -I./Optimization/linesearch # for optimization headers
+CXXFLAGS += -I./Newton # for Newton solver headers
+CXXFLAGS += -I. # for Eigen headers
+CXXFLAGS += -I../src $(include_dirs)
+CXXFLAGS += -std=c++11
+
+IBPMLIB = libibpm.a 
+
+.PHONY: lib clean depend
+
+all: $(TARGETS)
+
+$(TARGETS) : $(OBJECTS) lib
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o $@ $(OBJECTS) ../build/$(IBPMLIB) $(LDLIBS)
+
+lib:
+	cd ../build && $(MAKE)
+
+%.o : %.cc
+	$(CXX) $(CXXFLAGS) -c $^
+
+% : %.cc
+
+clean:
+	-$(RM) -r *.o $(TARGETS)
+	-$(RM) tecplot/*.plt
+
+depend:
+	$(MAKEDEPEND) $(CXXFLAGS) *.cc > .depend
+
+-include .depend

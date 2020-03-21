@@ -105,6 +105,12 @@ public:
     /// Return the BaseFlow
     inline const BaseFlow& getBaseFlow() const { return _baseFlow; }
 
+    // Return flux corresponding to forces
+    Flux force2flux(BoundaryVector& f);
+
+    // Return boundary velocity corresponding to flux
+    BoundaryVector flux2boundary(Flux &q);
+
 private:    
     // Perhaps copy constructor should be made private to prevent future memory deallocation errors
     

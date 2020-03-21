@@ -14,6 +14,7 @@
 namespace ibpm{
 	
 class ProjectionSolver;
+class Motion;
 
 
 // Base class
@@ -39,7 +40,7 @@ public:
     double getTimestep();
 	void advance( State& x );  
 	void advance( State& x, const Scalar& Bu );  
-	virtual void advanceSubstep( State& x, const Scalar& nonlinear, int i ); // virtual for SFD 
+	virtual void advanceSubstep( State& x, const Scalar& nonlinear, int i ); // virtual for SFD and adjoint2
     void setTol( double tol );
 
 protected: 
@@ -144,6 +145,49 @@ protected:
 private:
 	State _x0;
 };	
+
+class AdjointIBSolver2 : public IBSolver {
+  public:
+   AdjointIBSolver2(
+      Grid& grid,
+      NavierStokesModel& model,
+      double dt,
+      Scheme::SchemeType scheme,
+      const vector<State> x0periodic,
+      const int period,
+      const Motion& motion) :
+   IBSolver( grid, model, dt, scheme),
+      _x0periodic( x0periodic ),
+      _period( period ) {
+         assert(_period == static_cast<int>(x0periodic.size()));
+         _motion = motion.clone();
+      }
+
+   AdjointIBSolver2(
+      Grid& grid,
+      NavierStokesModel& model,
+      double dt,
+      Scheme::SchemeType scheme,
+      double tol,
+      const vector<State> x0periodic,
+      const int period,
+      const Motion& motion) :
+   IBSolver( grid, model, dt, scheme, tol ),
+      _x0periodic( x0periodic ),
+      _period( period ) {
+         assert(_period == static_cast<int>(x0periodic.size()));
+         _motion = motion.clone();
+      }
+
+  protected:
+   Scalar N(const State& x) const;
+   void advanceSubstep( State& x, const Scalar& nonlinear, int i );
+
+  private:
+   const vector<State> _x0periodic;
+   const int _period;
+   Motion *_motion;
+};
 	
 //! Navier-Stokes equations linearized about a periodic orbit.
 class LinearizedPeriodicIBSolver : public IBSolver {

@@ -59,6 +59,8 @@ bool OutputForce::doOutput( const double alpha, const double mag, const State& x
     //        = 2 L
     drag *= 2.;
     lift *= 2.;
+    drag = xF;
+    lift = yF;
     
     if ( _fp == NULL ) return false;
     fprintf( _fp, "%5d %.5e %.5e %.5e\n", x.timestep, x.time, drag, lift );   
@@ -78,7 +80,7 @@ bool OutputForce::doOutput(const State& x) {
 bool OutputForce::doOutput( const BaseFlow& q, const State& x) {
     double alpha = q.getAlpha();
     double mag = q.getMag();
-    
+
     return doOutput(alpha, mag, x);
 }
     

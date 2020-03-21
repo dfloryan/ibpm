@@ -145,6 +145,16 @@ namespace ibpm {
 		return velocity;
 	}
 
+   Flux NavierStokesModel::force2flux(BoundaryVector &f) {
+      Flux q = _regularizer.toFlux( f );
+      return q;
+   }
+
+   BoundaryVector NavierStokesModel::flux2boundary(Flux &q) {
+      BoundaryVector f = _regularizer.toBoundary( q );
+      return f;
+   }
+
 	
 } // namespace ibpm
 
